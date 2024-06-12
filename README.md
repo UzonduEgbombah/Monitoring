@@ -144,7 +144,7 @@ git clone web app
 https://github.com/UzonduEgbombah/BoardGame.git
 ```
 
-Install node explorer
+Install node exporter
 
 ```sh
 wget https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_exporter-1.8.1.linux-amd64.tar.gz
@@ -153,6 +153,415 @@ wget https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_e
 repeat similar process to extract,delete and rename
 
 ![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/24ec3974-01ee-49da-8f4f-0afa02229cb2)
+
+
+cd into node exporter and run 
+
+```sh
+./node_exporter &
+```
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/ff125bd2-c93d-4f28-8e0b-3df33ca8e629)
+
+
+copy VM IP address and add the port 9100 and paste on chrome 
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/08e6c9ed-eefa-4f09-a07a-6d8801d0f803)
+
+
+To ensure the Board-Game runs install
+
+- Java
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/c4281532-9ac0-429c-a469-b69520beef66)
+
+
+- Maven
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/e212669c-b485-4393-bb64-0f15321c0bfc)
+
+
+and run the command 
+
+```sh
+mvn package
+```
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/30caf125-85af-431e-a17d-bd5c65968cbc)
+
+
+cd into target
+
+```sh
+java -jar database_service_project-0.0.2.jar
+```
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/ca4e3598-9d14-4d64-b984-9868a663092f)
+
+
+now you can copy the vm IP with port 8080 to access BoardGame webb app
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/7b2562c2-1805-471c-8dee-5c323d63b52e)
+
+
+on your monitoring server cd into "prometheus and start it withethe command below :
+
+```sh
+./prometheus $
+```
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/01eda94e-9e4a-4af0-9aee-034a76941b6a)
+
+
+access with IP and node 9090
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/00a25e58-0ee2-489b-a41b-23d8309a34d9)
+
+
+
+- Now let's setup the alertrule
+
+create a new file in prometheus 
+
+```sh
+vi alert_rules.yml
+```
+
+paste the following rule, exit and save "wq"
+
+```sh
+groups:
+- name: alert_rules                   # Name of the alert rules group
+  rules:
+    - alert: InstanceDown
+      expr: up == 0                   # Expression to detect instance down
+      for: 1m
+      labels:
+        severity: "critical"
+      annotations:
+        summary: "Endpoint {{ $labels.instance }} down"
+        description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+    - alert: WebsiteDown
+      expr: probe_success == 0        # Expression to detect website down
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        description: The website at {{ $labels.instance }} is down.
+        summary: Website down
+
+    - alert: HostOutOfMemory
+      expr: node_memory_MemAvailable / node_memory_MemTotal * 100 < 25  # Expression to detect low memory
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host out of memory (instance {{ $labels.instance }})"
+        description: "Node memory is filling up (< 25% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - alert: HostOutOfDiskSpace
+      expr: (node_filesystem_avail{mountpoint="/"} * 100) / node_filesystem_size{mountpoint="/"} < 50  # Expression to detect low disk space
+      for: 1s
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host out of disk space (instance {{ $labels.instance }})"
+        description: "Disk is almost full (< 50% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - alert: HostHighCpuLoad
+      expr: (sum by (instance) (irate(node_cpu{job="node_exporter_metrics",mode="idle"}[5m]))) > 80  # Expression to detect high CPU load
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Host high CPU load (instance {{ $labels.instance }})"
+        description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - alert: ServiceUnavailable
+      expr: up{job="node_exporter"} == 0  # Expression to detect service unavailability
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Service Unavailable (instance {{ $labels.instance }})"
+        description: "The service {{ $labels.job }} is not available\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - alert: HighMemoryUsage
+      expr: (node_memory_Active / node_memory_MemTotal) * 100 > 90  # Expression to detect high memory usage
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High Memory Usage (instance {{ $labels.instance }})"
+        description: "Memory usage is > 90%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - alert: FileSystemFull
+      expr: (node_filesystem_avail / node_filesystem_size) * 100 < 10  # Expression to detect file system almost full
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "File System Almost Full (instance {{ $labels.instance }})"
+        description: "File system has < 10% free space\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+```
+
+
+now open prometheus.yml and remove the "alert_rules.yml" that was hashed
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/19eae9db-61a2-4260-952b-eaf9722e1506)
+
+
+
+
+cd into alertmanager and run it, access it with port 9093
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/483dced9-7b2a-47c4-b32e-7a3582164dba)
+
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/4a327e04-7207-48f9-92ea-2ed2f025a9dd)
+
+
+
+To make the rules inserted in the "alert_rules.yml" file to reflect, prometheus must be restarted
+
+```sh
+pgrep / kill
+```
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/5a0a9de7-690f-44c8-97f1-23a6c6095265)
+
+
+
+
+now it has reflected in prometheus, tap on alerts
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/f792f284-87b4-4eb6-8ace-21a2f331b2b8)
+
+
+
+### Notes:
+- The `&` at the end of each command ensures the process runs in the background.
+- Ensure that you have configured the `prometheus.yml` and `alertmanager.yml` configuration files correctly before starting the services.
+- Adjust the firewall and security settings to allow the necessary ports (typically 9090 for Prometheus, 9093 for Alertmanager, 9115 for Blackbox Exporter, and 9100 for Node Exporter) to be accessible.
+
+---
+
+# Prometheus and Alertmanager Configuration
+
+## Prometheus Configuration (`prometheus.yml`)
+
+### Global Configuration
+```yaml
+global:
+  scrape_interval: 15s                # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s            # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+```
+
+### Alertmanager Configuration
+```yaml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - 'localhost:9093'          # Alertmanager endpoint
+```
+
+### Rule Files
+```yaml
+rule_files:
+   - "alert_rules.yml"                # Path to alert rules file
+  # - "second_rules.yml"              # Additional rule files can be added here
+```
+
+### Scrape Configuration
+#### Prometheus Itself
+```yaml
+scrape_configs:
+  - job_name: "prometheus"            # Job name for Prometheus
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]   # Target to scrape (Prometheus itself)
+```
+
+#### Node Exporter
+```yaml
+  - job_name: "node_exporter"         # Job name for node exporter
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["3.110.195.114:9100"]  # Target node exporter endpoint
+```
+
+#### Blackbox Exporter
+```yaml
+  - job_name: 'blackbox'              # Job name for blackbox exporter
+    metrics_path: /probe              # Path for blackbox probe
+    params:
+      module: [http_2xx]              # Module to look for HTTP 200 response
+    static_configs:
+      - targets:
+        - http://prometheus.io        # HTTP target
+        - https://prometheus.io       # HTTPS target
+        - http://3.110.195.114:8080/  # HTTP target with port 8080
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 13.235.248.225:9115  # Blackbox exporter address
+```
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/6fa7d93d-971b-4664-8c1c-2c3ccdb5c0bd)
+
+
+
+
+
+## Alertmanager Configuration (`alertmanager.yml`)
+
+### Routing Configuration
+
+```sh
+route:
+  group_by:
+    - alertname
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: email-notifications
+receivers:
+  - name: email-notifications
+    email_configs:
+      - to: uzonduegbombah419@gmail.com
+        from: test@gmail.com
+        smarthost: smtp.gmail.com:587
+        auth_username: uzonduegbombah419@gmail.com
+        auth_identity: uzonduegbombah419@gmail.com
+        auth_password: qczm kxnu uygh wqja
+        send_resolved: true
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal:
+      - alertname
+      - dev
+      - instance
+```
+
+- remember to set up your own authentication password
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/bc05a4df-5537-4e89-bc90-2d38d6c8b829)
+
+
+
+Now restart prometheus and alertmanager
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/de30670a-22fc-4c54-a949-27d3ef9faee1)
+
+
+
+result should be similar
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/dd096839-5c92-40f6-a8ac-1937824c0d3b)
+
+
+
+Now to make sure this setup works I had to shutdown the mvn package command and confirm if i also got an email too
+
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/a2b2bdee-bd77-434c-aadd-607b780ff343)
+
+
+
+reflected succesfully
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/8483ae82-de99-4940-a612-c0820de65a11)
+
+
+E-mail came in after "1minute"
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/c52aa431-2990-40dc-8edc-cc6b55177c17)
+
+
+okay one more test, we killing the node exporter and see what happens
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/d4901643-4e47-40d6-8f9c-6fe0c984a4f2)
+
+
+reflected successfully
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/dffa82d1-8553-48c0-8cdc-0a760a17936f)
+
+
+
+now lets wait for the E-mail
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/b0668db8-c7e8-4f8e-80fb-00524e437872)
+
+
+
+
+![](https://github.com/UzonduEgbombah/Monitoring/assets/137091610/62bab504-0e18-4f43-b08f-784950b69375)
+
+
+
+uzondu egbombah
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
